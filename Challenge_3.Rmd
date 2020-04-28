@@ -1,0 +1,80 @@
+---
+title: "Challenge_3"
+author: "Andrew Frauenpreis"
+date: "4/26/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, libraries}
+library(tidyverse)
+library(httr)
+library(jsonlite)
+library(lubridate)
+library(leaflet)
+library(gganimate)
+library(glue)
+```
+```{r, country data}
+continents <- GET("https://api.teleport.org/api/continents/")
+continents <- fromJSON(rawToChar(continents$content))
+continents <- continents$`_links`$`continent:items`
+continents <- continents %>% 
+  mutate(href = 
+           str_extract_all(href, pattern = "geonames:[:alpha:]+"))
+continents <- continents %>% 
+  mutate(href = 
+           str_extract_all(href, pattern = "[:alpha:]+$"))
+continents$href <- unlist(continents$href)
+```
+```{r, urban area function}
+get_ua <- function(continent){
+  as.vector(continent)
+  data <- GET(glue("https://api.teleport.org/api/continents/geonames%3A{continent}/urban_areas/"))
+  data <- fromJSON(rawToChar(data$content))
+  data <- data$`_links`$`ua:items`
+  return(data)
+}
+```
+```{r, getting urban area data}
+ua_data <- get_ua(continents$href[1]) %>% 
+  mutate(continent = continents$href[1])
+for(i in 2:7){
+  holder <- get_ua(continents$href[i]) %>% 
+    mutate(continent = continents$href[i])
+  full_join(ua_data, holder)
+}
+```
+```{r, ua data clean}
+ua_data <- ua_data %>% 
+  mutate(href = 
+           str_extract_all(href, pattern = "iso_alpha2:[:alpha:]+"))
+ua_data <- ua_data %>% 
+  mutate(href = 
+           str_extract_all(href, pattern = "[:alpha:]+$"))
+ua_data$href <- unlist(ua_data$href)
+ua_data <- ua_data %>% 
+  mutate(slug = tolower(name))
+  
+```
+```{r, ua quality scores function}
+get_ua <- function(continent){
+  data <- GET(glue("https://api.teleport.org/api/urban_areas/slug%3Aanchorage/scores/"))
+  data <- fromJSON(rawToChar(data$content))
+  tesdata <- data$`_links`$`ua:items`
+  return(data)
+}
+```
+```{r, get quality scores}
+quality_data <- get_ua(continents$href[1]) %>% 
+  mutate(continents = continents$href[1])
+for (i in 2:length(continents$href)){
+  holder <- get_ua(unlist(continents$href[1]))
+  holder <- holder %>% 
+    mutate(continents = continents$href[1])
+  quality_data <- full_join(quality_data, holder)
+}
+```
